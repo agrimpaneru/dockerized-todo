@@ -15,7 +15,10 @@ services:
       - MYSQL_PASSWORD=password
       - MYSQL_DATABASE=todo_db
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      
+
 
   # MySQL Database Container
   db:
@@ -28,11 +31,17 @@ services:
       - db_data:/var/lib/mysql
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # Frontend Container
   frontend:
     build:
-      context: ./frontend  # Path to your frontend directory
+      context: ./frontend
     container_name: todo-frontend
     ports:
       - "8000:80"
