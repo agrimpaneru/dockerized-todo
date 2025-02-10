@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Todo App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .add-task {
+            margin-bottom: 20px;
+        }
+
+        #taskInput {
+            padding: 8px;
+            width: 70%;
+            margin-right: 10px;
+        }
+
+        button {
+            padding: 8px 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            background-color: #f2f2f2;
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .delete-btn {
+            background-color: #f44336;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .delete-btn:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Todo App</h1>
+        
+        <div class="add-task">
+            <input type="text" id="taskInput" placeholder="Add new task">
+            <button onclick="addTask()">Add Task</button>
+        </div>
+
+        <div id="taskList">
+            <h2>Tasks</h2>
+            <ul id="tasks"></ul>
+        </div>
+    </div>
+
+    <script>
+        // Base URL for your API
+        const baseUrl = 'http://localhost:5000';
+
+        // On page load, get the tasks
+        document.addEventListener("DOMContentLoaded", function() {
+            getTasks();
+        });
+
+        // Function to add a task
+        function addTask() {
+            const taskInput = document.getElementById("taskInput");
+            const task = taskInput.value;
+
+            if (task.trim()) {
+                fetch(`${baseUrl}/add_task`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ task: task })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log(data);
+                    taskInput.value = '';  // Clear the input
+                    getTasks();  // Refresh the task list
+                })
+                .catch(error => console.error('Error adding task:', error));
+            }
+        }
+
+        // Function to get all tasks
+        function getTasks() {
+            fetch(`${baseUrl}/get_tasks`, {
+                method: 'GET',
+            })
+            .then(response => response.json())
+            .then(data => {
+                const taskList = document.getElementById("tasks");
+                taskList.innerHTML = '';  // Clear the current list
+
+                data.forEach(task => {
+                    const li = document.createElement('li');
+                    li.textContent = task[1];  // task[1] is the task description
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = 'Delete';
+                    deleteButton.classList.add('delete-btn');
+                    deleteButton.onclick = () => deleteTask(task[0]);  // task[0] is the task id
+                    li.appendChild(deleteButton);
+                    taskList.appendChild(li);
+                });
+            })
+            .catch(error => console.error('Error fetching tasks:', error));
+        }
+
+        // Function to delete a task
+        function deleteTask(taskId) {
+            fetch(`${baseUrl}/delete_task/${taskId}`, {
+                method: 'DELETE',
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                getTasks();  // Refresh the task list
+            })
+            .catch(error => console.error('Error deleting task:', error));
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Flask App Container
+  flask-app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flask-app
+    ports:
+      - "5000:5000"
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=todo_db
+    depends_on:
+      - db
+
+  # MySQL Database Container
+  db:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: todo_db
+    volumes:
+      - db_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+  # Frontend Container
+  frontend:
+    build:
+      context: ./frontend  # Path to your frontend directory
+    container_name: todo-frontend
+    ports:
+      - "8000:80"
+
+volumes:
+  db_data:
+    driver: local
