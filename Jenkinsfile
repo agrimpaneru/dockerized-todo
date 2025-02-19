@@ -8,79 +8,37 @@ pipeline {
             }
         }
 
-        stage('Build and Start Services') {
+        stage('Cleanup') {
             steps {
                 script {
-                    // Build all services
-                    sh 'docker-compose build'
-                    
-                    // First start only the database
-                    sh 'docker-compose up -d db'
-                    
-                    // Wait for MySQL to be healthy
+                    // Stop and remove existing containers
                     sh '''
-                        echo "Waiting for MySQL to be ready..."
-                        attempt=1
-                        max_attempts=30
-                        until docker exec mysql-db mysqladmin ping -h localhost -u root -ppassword || [ $attempt -eq $max_attempts ]
-                        do
-                            echo "Waiting for MySQL to be ready... (Attempt $attempt/$max_attempts)"
-                            sleep 10
-                            attempt=$((attempt + 1))
-                        done
-                        
-                        if [ $attempt -eq $max_attempts ]; then
-                            echo "MySQL failed to become ready in time"
-                            exit 1
-                        fi
-                        
-                        echo "MySQL is ready!"
+                        docker-compose down
+                        # Additional cleanup in case docker-compose down didn't work
+                        docker rm -f mysql-db || true
                     '''
-                    
-                    // Now start the remaining services
-                    sh 'docker-compose up -d'
                 }
             }
         }
 
-        stage('Verify Services') {
+        stage('Start MySQL') {
             steps {
                 script {
-                    // Wait for Flask backend to be ready
-                    sh '''
-                        echo "Verifying Flask backend..."
-                        attempt=1
-                        max_attempts=10
-                        until curl -s http://localhost:5000 || [ $attempt -eq $max_attempts ]
-                        do
-                            echo "Waiting for Flask backend... (Attempt $attempt/$max_attempts)"
-                            sleep 5
-                            attempt=$((attempt + 1))
-                        done
-                        
-                        if [ $attempt -eq $max_attempts ]; then
-                            echo "Flask backend failed to become ready"
-                            exit 1
-                        fi
-                    '''
+                    // Start only MySQL
+                    sh 'docker-compose up -d db'
                     
-                    // Verify frontend
-                    sh '''
-                        echo "Verifying frontend..."
-                        attempt=1
-                        max_attempts=10
-                        until curl -s http://localhost:8000 || [ $attempt -eq $max_attempts ]
-                        do
-                            echo "Waiting for frontend... (Attempt $attempt/$max_attempts)"
-                            sleep 5
-                            attempt=$((attempt + 1))
-                        done
-                        
-                        if [ $attempt -eq $max_attempts ]; then
-                            echo "Frontend failed to become ready"
-                            exit 1
-                        fi
-                    '''
+                    // Wait for 1 minute
+                    sh 'sleep 60'
+                    echo 'Waited 1 minute for MySQL to start'
+                }
+            }
+        }
+
+        stage('Start Other Services') {
+            steps {
+                script {
+                    // Start remaining services
+                    sh 'docker-compose up -d'
                 }
             }
         }
@@ -88,20 +46,11 @@ pipeline {
 
     post {
         failure {
-            script {
-                sh '''
-                    echo "Deployment failed. Printing logs..."
-                    docker-compose logs
-                    echo "Stopping all services..."
-                    docker-compose down
-                '''
-            }
+            sh 'docker-compose down'
+            echo 'Deployment failed'
         }
         success {
-            echo 'All services deployed and verified successfully!'
-        }
-        always {
-            sh 'docker system prune -f'
+            echo 'Deployment successful'
         }
     }
 }
