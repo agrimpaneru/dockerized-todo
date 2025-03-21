@@ -8,35 +8,35 @@ pipeline {
             }
         }
 
-        stage('Cleanup Application Containers') {
+        stage('Cleanup Application and Database Containers') {
             steps {
                 script {
-                    // Stop and remove only application containers
+                    // Stop and remove application and database containers
                     sh '''
-                        docker-compose stop flask-app frontend
-                        docker-compose rm -f flask-app frontend
+                        docker-compose stop flask-app frontend db
+                        docker-compose rm -f flask-app frontend db
                         
-                        # Remove application images to force rebuild
+                        # Remove application and database images to force rebuild
                         docker rmi -f $(docker images | grep 'flask-app' | awk '{print $3}') || true
                         docker rmi -f $(docker images | grep 'todo-frontend' | awk '{print $3}') || true
+                        docker rmi -f $(docker images | grep 'mysql:8.0' | awk '{print $3}') || true
+                        
+                        # Optionally remove the database volume to start completely fresh
+                        docker volume rm $(docker volume ls -q | grep db_data) || true
                     '''
                 }
             }
         }
 
-        stage('Start MySQL') {
+        stage('Start Fresh Database') {
             steps {
                 script {
-                    // Start only MySQL if not running
+                    // Start a fresh MySQL instance
                     sh '''
-                        if [ -z "$(docker ps -q -f name=mysql-db)" ]; then
-                            docker-compose up -d db
-                            # Wait for MySQL to initialize
-                            sleep 60
-                            echo 'Waited 1 minute for MySQL to start'
-                        else
-                            echo 'MySQL already running, skipping startup'
-                        fi
+                        docker-compose up -d db
+                        # Wait for MySQL to initialize
+                        sleep 60
+                        echo 'Waited 1 minute for fresh MySQL to start'
                     '''
                 }
             }
@@ -79,10 +79,10 @@ pipeline {
     post {
         failure {
             script {
-                // Only stop application containers on failure, not monitoring
+                // Only stop application and database containers on failure, not monitoring
                 sh '''
-                    docker-compose stop flask-app frontend
-                    docker-compose rm -f flask-app frontend
+                    docker-compose stop flask-app frontend db
+                    docker-compose rm -f flask-app frontend db
                 '''
             }
             echo 'Deployment failed'
