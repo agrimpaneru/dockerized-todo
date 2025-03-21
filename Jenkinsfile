@@ -8,14 +8,17 @@ pipeline {
             }
         }
 
-        stage('Cleanup') {
+        stage('Cleanup Application Containers') {
             steps {
                 script {
-                    // Stop and remove existing containers
+                    // Stop and remove only application containers
                     sh '''
-                        docker-compose down
-                        # Additional cleanup in case docker-compose down didn't work
-                        docker rm -f mysql-db || true
+                        docker-compose stop flask-app frontend
+                        docker-compose rm -f flask-app frontend
+                        
+                        # Remove application images to force rebuild
+                        docker rmi -f $(docker images | grep 'flask-app' | awk '{print $3}') || true
+                        docker rmi -f $(docker images | grep 'todo-frontend' | awk '{print $3}') || true
                     '''
                 }
             }
@@ -24,21 +27,50 @@ pipeline {
         stage('Start MySQL') {
             steps {
                 script {
-                    // Start only MySQL
-                    sh 'docker-compose up -d db'
-                    
-                    // Wait for 1 minute
-                    sh 'sleep 60'
-                    echo 'Waited 1 minute for MySQL to start'
+                    // Start only MySQL if not running
+                    sh '''
+                        if [ -z "$(docker ps -q -f name=mysql-db)" ]; then
+                            docker-compose up -d db
+                            # Wait for MySQL to initialize
+                            sleep 60
+                            echo 'Waited 1 minute for MySQL to start'
+                        else
+                            echo 'MySQL already running, skipping startup'
+                        fi
+                    '''
                 }
             }
         }
 
-        stage('Start Other Services') {
+        stage('Build and Start Application') {
             steps {
                 script {
-                    // Start remaining services
-                    sh 'docker-compose up -d'
+                    // Force rebuild of application services
+                    sh 'docker-compose build --no-cache flask-app frontend'
+                    
+                    // Start application services
+                    sh 'docker-compose up -d flask-app frontend'
+                }
+            }
+        }
+
+        stage('Ensure Monitoring') {
+            steps {
+                script {
+                    // Start monitoring services only if they're not running
+                    sh '''
+                        if [ -z "$(docker ps -q -f name=prometheus)" ]; then
+                            docker-compose up -d prometheus
+                        fi
+                        
+                        if [ -z "$(docker ps -q -f name=cadvisor)" ]; then
+                            docker-compose up -d cadvisor
+                        fi
+                        
+                        if [ -z "$(docker ps -q -f name=grafana)" ]; then
+                            docker-compose up -d grafana
+                        fi
+                    '''
                 }
             }
         }
@@ -46,7 +78,13 @@ pipeline {
 
     post {
         failure {
-            sh 'docker-compose down'
+            script {
+                // Only stop application containers on failure, not monitoring
+                sh '''
+                    docker-compose stop flask-app frontend
+                    docker-compose rm -f flask-app frontend
+                '''
+            }
             echo 'Deployment failed'
         }
         success {
