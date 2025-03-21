@@ -496,121 +496,160 @@
 
         // Function to render tasks based on the filter
         function renderTasks() {
-    const taskList = document.getElementById("tasks");
-    const emptyState = document.getElementById("emptyState");
-    taskList.innerHTML = '';  // Clear the current list
-    
-    // Convert taskData to array if it's not already (handle both formats)
-    let tasks = Array.isArray(taskData) ? taskData : Object.values(taskData);
-    
-    let filteredTasks = [...tasks];
-    
-    if (currentFilter === 'active') {
-        filteredTasks = tasks.filter(task => {
-            // Handle both object format and array format
-            return typeof task === 'object' && task !== null 
-                ? !task.completed 
-                : !task[2];
-        });
-    } else if (currentFilter === 'completed') {
-        filteredTasks = tasks.filter(task => {
-            return typeof task === 'object' && task !== null 
-                ? task.completed 
-                : task[2];
-        });
-    }
-    
-    if (filteredTasks.length === 0) {
-        emptyState.style.display = 'block';
-    } else {
-        emptyState.style.display = 'none';
-    }
-    
-    filteredTasks.forEach(task => {
-        // Extract task data handling both object and array format
-        const taskId = typeof task === 'object' && task !== null ? task.id : task[0];
-        const taskText = typeof task === 'object' && task !== null ? task.task : task[1];
-        const completed = typeof task === 'object' && task !== null ? task.completed : (task[2] || false);
-        
-        const li = document.createElement('li');
-        li.className = 'animated-item';
-        if (completed) {
-            li.classList.add('completed');
+            const taskList = document.getElementById("tasks");
+            const emptyState = document.getElementById("emptyState");
+            taskList.innerHTML = '';  // Clear the current list
+            
+            // Make sure taskData is an array
+            const tasks = Array.isArray(taskData) ? taskData : Object.values(taskData);
+            
+            let filteredTasks = [...tasks];
+            
+            if (currentFilter === 'active') {
+                filteredTasks = tasks.filter(task => {
+                    // Handle both object format and array format
+                    return typeof task === 'object' && task !== null 
+                        ? !task.completed 
+                        : !task[2];
+                });
+            } else if (currentFilter === 'completed') {
+                filteredTasks = tasks.filter(task => {
+                    return typeof task === 'object' && task !== null 
+                        ? task.completed 
+                        : task[2];
+                });
+            }
+            
+            if (filteredTasks.length === 0) {
+                emptyState.style.display = 'block';
+            } else {
+                emptyState.style.display = 'none';
+            }
+            
+            filteredTasks.forEach(task => {
+                // Extract task data handling both object and array format
+                const taskId = typeof task === 'object' && task !== null ? task.id : task[0];
+                const taskText = typeof task === 'object' && task !== null ? task.task : task[1];
+                const completed = typeof task === 'object' && task !== null ? task.completed : (task[2] || false);
+                
+                const li = document.createElement('li');
+                li.className = 'animated-item';
+                if (completed) {
+                    li.classList.add('completed');
+                }
+                
+                // Create task content container
+                const taskContent = document.createElement('div');
+                taskContent.classList.add('task-content');
+                
+                // Create checkbox
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = completed;
+                checkbox.classList.add('task-checkbox');
+                checkbox.onchange = () => toggleTaskCompletion(taskId, !completed);
+                
+                // Create task text span
+                const taskTextSpan = document.createElement('span');
+                taskTextSpan.textContent = taskText;
+                taskTextSpan.classList.add('task-text');
+                
+                // Add checkbox and text to task content
+                taskContent.appendChild(checkbox);
+                taskContent.appendChild(taskTextSpan);
+                
+                // Create action buttons container
+                const taskActions = document.createElement('div');
+                taskActions.classList.add('task-actions');
+                
+                // Create edit button
+                const editButton = document.createElement('button');
+                editButton.innerHTML = '<i class="fas fa-edit"></i>';
+                editButton.classList.add('btn', 'edit-btn');
+                editButton.onclick = () => editTask(li, taskId, taskText);
+                
+                // Create delete button
+                const deleteButton = document.createElement('button');
+                deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteButton.classList.add('btn', 'delete-btn');
+                deleteButton.onclick = () => deleteTask(taskId);
+                
+                // Add buttons to actions container
+                taskActions.appendChild(editButton);
+                taskActions.appendChild(deleteButton);
+                
+                // Add content and actions to list item
+                li.appendChild(taskContent);
+                li.appendChild(taskActions);
+                
+                // Add the list item to the task list
+                taskList.appendChild(li);
+            });
+            
+            // Update task count
+            updateTaskCount();
         }
-        
-        // Create task content container
-        const taskContent = document.createElement('div');
-        taskContent.classList.add('task-content');
-        
-        // Create checkbox
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = completed;
-        checkbox.classList.add('task-checkbox');
-        checkbox.onchange = () => toggleTaskCompletion(taskId, !completed);
-        
-        // Create task text span
-        const taskTextSpan = document.createElement('span');
-        taskTextSpan.textContent = taskText;
-        taskTextSpan.classList.add('task-text');
-        
-        // Add checkbox and text to task content
-        taskContent.appendChild(checkbox);
-        taskContent.appendChild(taskTextSpan);
-        
-        // Create action buttons container
-        const taskActions = document.createElement('div');
-        taskActions.classList.add('task-actions');
-        
-        // Create edit button
-        const editButton = document.createElement('button');
-        editButton.innerHTML = '<i class="fas fa-edit"></i>';
-        editButton.classList.add('btn', 'edit-btn');
-        editButton.onclick = () => editTask(li, taskId, taskText);
-        
-        // Create delete button
-        const deleteButton = document.createElement('button');
-        deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
-        deleteButton.classList.add('btn', 'delete-btn');
-        deleteButton.onclick = () => deleteTask(taskId);
-        
-        // Add buttons to actions container
-        taskActions.appendChild(editButton);
-        taskActions.appendChild(deleteButton);
-        
-        // Add content and actions to list item
-        li.appendChild(taskContent);
-        li.appendChild(taskActions);
-        
-        // Add the list item to the task list
-        taskList.appendChild(li);
-    });
-    
-    // Update task count
-    updateTaskCount();
-}
 
         // Function to update task count
-// Update the updateTaskCount function to handle the object format as well
-function updateTaskCount() {
-    // Convert taskData to array if it's not already
-    const tasks = Array.isArray(taskData) ? taskData : Object.values(taskData);
-    
-    const activeTaskCount = tasks.filter(task => {
-        return typeof task === 'object' && task !== null 
-            ? !task.completed 
-            : !task[2];
-    }).length;
-    
-    document.getElementById('taskCount').textContent = activeTaskCount;
-}
+        function updateTaskCount() {
+            // Convert taskData to array if it's not already
+            const tasks = Array.isArray(taskData) ? taskData : Object.values(taskData);
+            
+            const activeTaskCount = tasks.filter(task => {
+                return typeof task === 'object' && task !== null 
+                    ? !task.completed 
+                    : !task[2];
+            }).length;
+            
+            document.getElementById('taskCount').textContent = activeTaskCount;
+        }
 
-// Update the socket.on('tasks_update') handler to log the data format
-socket.on('tasks_update', function(data) {
-    console.log('Received tasks update:', data);
-    taskData = data;
-    renderTasks();
-});
+        // Function to toggle task completion
+        function toggleTaskCompletion(taskId, completed) {
+            // Ensure taskId is defined
+            if (taskId === undefined) {
+                console.error('Task ID is undefined');
+                return;
+            }
+            
+            fetch(`${baseUrl}/update_task/${taskId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ completed: completed })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Task completion updated:', data);
+                
+                // Optionally update the UI directly without waiting for socket update
+                // Find the task in taskData and update its completion status
+                if (Array.isArray(taskData)) {
+                    // If taskData is an array of objects
+                    const taskIndex = taskData.findIndex(task => 
+                        (typeof task === 'object' && task !== null) ? task.id === taskId : task[0] === taskId
+                    );
+                    
+                    if (taskIndex !== -1) {
+                        if (typeof taskData[taskIndex] === 'object' && taskData[taskIndex] !== null) {
+                            taskData[taskIndex].completed = completed;
+                        } else {
+                            taskData[taskIndex][2] = completed;
+                        }
+                        renderTasks();
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error updating task completion:', error);
+            });
+        }
 
         // Function to edit a task
         function editTask(listItem, taskId, currentText) {
@@ -675,12 +714,18 @@ socket.on('tasks_update', function(data) {
 
         // Function to delete a task
         function deleteTask(taskId) {
+            // Ensure taskId is defined
+            if (taskId === undefined) {
+                console.error('Task ID is undefined');
+                return;
+            }
+            
             fetch(`${baseUrl}/delete_task/${taskId}`, {
                 method: 'DELETE',
             })
             .then(response => response.json())
             .then(data => {
-                console.log(data);
+                console.log('Task deleted:', data);
             })
             .catch(error => {
                 console.error('Error deleting task:', error);
@@ -694,7 +739,7 @@ socket.on('tasks_update', function(data) {
             })
             .then(response => response.json())
             .then(data => {
-                console.log(data);
+                console.log('Cleared completed tasks:', data);
             })
             .catch(error => {
                 console.error('Error clearing completed tasks:', error);
