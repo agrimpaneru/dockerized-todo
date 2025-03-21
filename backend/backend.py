@@ -5,9 +5,9 @@ import os
 from flask_cors import CORS
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": ["http://98.70.73.193:8000", "http://localhost:8000"]}}, supports_credentials=True)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins=["http://98.70.73.193:8000", "http://localhost:8000"])
 
 # Database configuration
 db_host = os.getenv('MYSQL_HOST', 'db-service')
