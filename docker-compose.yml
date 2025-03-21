@@ -1,7 +1,6 @@
 version: '3.8'
-
 services:
-  # Flask App Container
+  # Your application services
   flask-app:
     build:
       context: ./backend
@@ -10,7 +9,6 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - MYSQL_HOST=mysql-db
       - MYSQL_HOST=db
       - MYSQL_USER=root
       - MYSQL_PASSWORD=password
@@ -18,10 +16,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-      
-
-
-  # MySQL Database Container
+     
   db:
     image: mysql:8.0
     container_name: mysql-db
@@ -39,7 +34,6 @@ services:
       retries: 5
       start_period: 30s
 
-  # Frontend Container
   frontend:
     build:
       context: ./frontend
@@ -47,6 +41,49 @@ services:
     ports:
       - "8000:80"
 
+  # Monitoring services
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8081:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+  
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
 volumes:
   db_data:
     driver: local
+  prometheus_data: {}
+  grafana_data: {}

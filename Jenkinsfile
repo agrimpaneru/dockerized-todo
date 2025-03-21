@@ -1,33 +1,26 @@
 pipeline {
     agent any
+
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
+
         stage('Cleanup') {
             steps {
                 script {
-                    // Stop and remove existing containers and images
+                    // Stop and remove existing containers
                     sh '''
                         docker-compose down
-                        # Remove any existing images for your services
-                        docker rmi $(docker images -q flask-app) || true
-                        docker rmi $(docker images -q todo-frontend) || true
+                        # Additional cleanup in case docker-compose down didn't work
                         docker rm -f mysql-db || true
                     '''
                 }
             }
         }
-        stage('Build') {
-            steps {
-                script {
-                    // Force rebuild all images
-                    sh 'docker-compose build --no-cache'
-                }
-            }
-        }
+
         stage('Start MySQL') {
             steps {
                 script {
@@ -40,6 +33,7 @@ pipeline {
                 }
             }
         }
+
         stage('Start Other Services') {
             steps {
                 script {
@@ -49,6 +43,7 @@ pipeline {
             }
         }
     }
+
     post {
         failure {
             sh 'docker-compose down'
