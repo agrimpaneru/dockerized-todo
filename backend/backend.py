@@ -42,6 +42,8 @@ def init_db():
     # Check if the completed column exists, and add it if it doesn't
     try:
         cursor.execute("SELECT completed FROM tasks LIMIT 1")
+        # Add this line to consume the result
+        cursor.fetchone()
     except mysql.connector.Error:
         cursor.execute("ALTER TABLE tasks ADD COLUMN completed BOOLEAN DEFAULT FALSE")
         cursor.execute("ALTER TABLE tasks ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
@@ -49,9 +51,7 @@ def init_db():
     
     conn.commit()
     cursor.close()
-    conn.close()
-
-# Initialize database on startup
+    conn.close()# Initialize database on startup
 init_db()
 
 # Function to get all tasks
