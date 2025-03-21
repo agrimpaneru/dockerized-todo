@@ -275,6 +275,58 @@
                 flex-direction: column;
             }
         }
+
+        .connection-alert {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .connection-alert.visible {
+            opacity: 1;
+        }
+
+        .connection-alert.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .connection-alert.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .connection-alert.disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .clear-completed-btn {
+            margin-top: 15px;
+            background-color: transparent;
+            border: 1px solid #ddd;
+            color: #6c757d;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+
+        .clear-completed-btn:hover {
+            background-color: #e9ecef;
+        }
+
+        .animated-item {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -285,6 +337,10 @@
 
     <div class="container">
         <h1><i class="fas fa-check-circle"></i> Smart Todo App</h1>
+        
+        <div id="connectionAlert" class="connection-alert connecting visible">
+            <i class="fas fa-sync fa-spin"></i> Connecting to server...
+        </div>
         
         <div class="filters">
             <button class="filter-btn active" data-filter="all">All</button>
@@ -298,7 +354,6 @@
         </div>
 
         <div id="taskList">
-            <div id="statusIndicator" class="status-indicator">Connected</div>
             <ul id="tasks"></ul>
             <div id="emptyState" class="empty-state" style="display: none;">
                 <i class="fas fa-clipboard-list"></i>
@@ -309,29 +364,27 @@
         <div class="task-count">
             <span id="taskCount">0</span> tasks remaining
         </div>
+        
+        <button id="clearCompletedBtn" class="clear-completed-btn" onclick="clearCompleted()">
+            Clear completed
+        </button>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         // Base URL for your API
         const baseUrl = 'http://98.70.73.193:5000';
         let currentFilter = 'all';
-        let lastFetchTime = 0;
         let taskData = [];
-        let pollingInterval;
         let isDarkMode = false;
+        let socket = null;
 
-        // On page load, get the tasks and start auto-refresh
+        // On page load, setup the app
         document.addEventListener("DOMContentLoaded", function() {
             // Check for saved dark mode preference
             if (localStorage.getItem('darkMode') === 'true') {
                 toggleDarkMode();
             }
-            
-            // Initial tasks fetch
-            getTasks();
-            
-            // Set up the polling for synchronization
-            startAutoRefresh();
             
             // Setup filter buttons
             setupFilterButtons();
@@ -342,59 +395,58 @@
                     addTask();
                 }
             });
+            
+            // Initialize WebSocket connection
+            initializeSocket();
         });
 
-        // Function to start auto-refresh
-        function startAutoRefresh() {
-            // Poll every 3 seconds to check for changes
-            pollingInterval = setInterval(checkForUpdates, 3000);
-            updateStatus("Connected");
-        }
-
-        // Function to stop auto-refresh
-        function stopAutoRefresh() {
-            clearInterval(pollingInterval);
-            updateStatus("Disconnected");
-        }
-
-        // Update the connection status indicator
-        function updateStatus(status) {
-            const statusEl = document.getElementById("statusIndicator");
-            statusEl.textContent = status;
+        // Initialize Socket.IO connection
+        function initializeSocket() {
+            updateConnectionStatus('connecting');
             
-            if (status === "Connected") {
-                statusEl.style.color = "#4CAF50";
-            } else if (status === "Disconnected") {
-                statusEl.style.color = "#f44336";
-            } else if (status === "Syncing...") {
-                statusEl.style.color = "#2196F3";
-            }
+            // Create Socket.IO connection
+            socket = io(baseUrl);
+            
+            // Socket connection event handlers
+            socket.on('connect', function() {
+                console.log('Connected to server');
+                updateConnectionStatus('connected');
+            });
+            
+            socket.on('disconnect', function() {
+                console.log('Disconnected from server');
+                updateConnectionStatus('disconnected');
+            });
+            
+            socket.on('connect_error', function(error) {
+                console.log('Connection error:', error);
+                updateConnectionStatus('disconnected');
+            });
+            
+            // Listen for tasks update events
+            socket.on('tasks_update', function(data) {
+                console.log('Received tasks update:', data);
+                taskData = data;
+                renderTasks();
+            });
         }
 
-        // Function to check if there are updates
-        function checkForUpdates() {
-            updateStatus("Syncing...");
-            fetch(`${baseUrl}/get_tasks`, {
-                method: 'GET',
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Compare with current data to see if there are changes
-                const dataString = JSON.stringify(data);
-                const currentDataString = JSON.stringify(taskData);
-                
-                if (dataString !== currentDataString) {
-                    // Data has changed, update the UI
-                    taskData = data;
-                    renderTasks();
-                }
-                
-                updateStatus("Connected");
-            })
-            .catch(error => {
-                console.error('Error checking for updates:', error);
-                updateStatus("Disconnected");
-            });
+        // Update connection status UI
+        function updateConnectionStatus(status) {
+            const alertEl = document.getElementById('connectionAlert');
+            alertEl.className = 'connection-alert visible ' + status;
+            
+            if (status === 'connecting') {
+                alertEl.innerHTML = '<i class="fas fa-sync fa-spin"></i> Connecting to server...';
+            } else if (status === 'connected') {
+                alertEl.innerHTML = '<i class="fas fa-check-circle"></i> Connected';
+                // Hide the alert after 3 seconds
+                setTimeout(() => {
+                    alertEl.classList.remove('visible');
+                }, 3000);
+            } else if (status === 'disconnected') {
+                alertEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Disconnected. Trying to reconnect...';
+            }
         }
 
         // Function to set up filter buttons
@@ -421,8 +473,6 @@
             const task = taskInput.value;
 
             if (task.trim()) {
-                updateStatus("Syncing...");
-                
                 fetch(`${baseUrl}/add_task`, {
                     method: 'POST',
                     headers: {
@@ -437,33 +487,11 @@
                 .then(data => {
                     console.log(data);
                     taskInput.value = '';  // Clear the input
-                    getTasks();  // Refresh the task list
                 })
                 .catch(error => {
                     console.error('Error adding task:', error);
-                    updateStatus("Disconnected");
                 });
             }
-        }
-
-        // Function to get all tasks
-        function getTasks() {
-            updateStatus("Syncing...");
-            
-            fetch(`${baseUrl}/get_tasks`, {
-                method: 'GET',
-            })
-            .then(response => response.json())
-            .then(data => {
-                taskData = data;
-                renderTasks();
-                updateStatus("Connected");
-                lastFetchTime = Date.now();
-            })
-            .catch(error => {
-                console.error('Error fetching tasks:', error);
-                updateStatus("Disconnected");
-            });
         }
 
         // Function to render tasks based on the filter
@@ -492,6 +520,7 @@
                 const completed = task[2] || false;  // task[2] is the completed state
                 
                 const li = document.createElement('li');
+                li.className = 'animated-item';
                 if (completed) {
                     li.classList.add('completed');
                 }
@@ -556,8 +585,6 @@
 
         // Function to toggle task completion
         function toggleTaskCompletion(taskId, completed) {
-            updateStatus("Syncing...");
-            
             fetch(`${baseUrl}/update_task/${taskId}`, {
                 method: 'PUT',
                 headers: {
@@ -568,11 +595,9 @@
             .then(response => response.json())
             .then(data => {
                 console.log(data);
-                getTasks();  // Refresh the task list
             })
             .catch(error => {
                 console.error('Error updating task:', error);
-                updateStatus("Disconnected");
             });
         }
 
@@ -620,8 +645,6 @@
         // Function to save an edited task
         function saveTask(taskId, newText) {
             if (newText.trim()) {
-                updateStatus("Syncing...");
-                
                 fetch(`${baseUrl}/update_task/${taskId}`, {
                     method: 'PUT',
                     headers: {
@@ -632,30 +655,38 @@
                 .then(response => response.json())
                 .then(data => {
                     console.log(data);
-                    getTasks();  // Refresh the task list
                 })
                 .catch(error => {
                     console.error('Error updating task:', error);
-                    updateStatus("Disconnected");
                 });
             }
         }
 
         // Function to delete a task
         function deleteTask(taskId) {
-            updateStatus("Syncing...");
-            
             fetch(`${baseUrl}/delete_task/${taskId}`, {
                 method: 'DELETE',
             })
             .then(response => response.json())
             .then(data => {
                 console.log(data);
-                getTasks();  // Refresh the task list
             })
             .catch(error => {
                 console.error('Error deleting task:', error);
-                updateStatus("Disconnected");
+            });
+        }
+
+        // Function to clear completed tasks
+        function clearCompleted() {
+            fetch(`${baseUrl}/clear_completed`, {
+                method: 'DELETE',
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+            })
+            .catch(error => {
+                console.error('Error clearing completed tasks:', error);
             });
         }
 
@@ -674,30 +705,6 @@
             // Save preference
             localStorage.setItem('darkMode', isDarkMode);
         }
-
-        // Handle visibility change to pause/resume polling when tab is inactive
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden) {
-                // Page is hidden, pause polling to save resources
-                stopAutoRefresh();
-            } else {
-                // Page is visible again, resume polling and immediately check for updates
-                getTasks();
-                startAutoRefresh();
-            }
-        });
-
-        // Handle window focus/blur events
-        window.addEventListener('focus', function() {
-            // Window got focus, immediately check for updates and resume polling
-            getTasks();
-            startAutoRefresh();
-        });
-
-        window.addEventListener('blur', function() {
-            // Window lost focus, pause polling to save resources
-            stopAutoRefresh();
-        });
     </script>
 </body>
 </html>
