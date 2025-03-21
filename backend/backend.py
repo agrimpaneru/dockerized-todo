@@ -42,7 +42,7 @@ def init_db():
     # Check if the completed column exists, and add it if it doesn't
     try:
         cursor.execute("SELECT completed FROM tasks LIMIT 1")
-        # Add this line to consume the result
+        # Consume the result to prevent "Unread result found" error
         cursor.fetchone()
     except mysql.connector.Error:
         cursor.execute("ALTER TABLE tasks ADD COLUMN completed BOOLEAN DEFAULT FALSE")
@@ -51,13 +51,15 @@ def init_db():
     
     conn.commit()
     cursor.close()
-    conn.close()# Initialize database on startup
+    conn.close()
+
+# Initialize database on startup
 init_db()
 
 # Function to get all tasks
 def get_all_tasks():
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(dictionary=True)  # Returns results as dictionaries
     cursor.execute("SELECT id, task, completed FROM tasks ORDER BY created_at DESC")
     tasks = cursor.fetchall()
     cursor.close()
@@ -217,4 +219,5 @@ def clear_completed():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    # Added allow_unsafe_werkzeug=True to fix the Werkzeug production error
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
